@@ -35,11 +35,19 @@ team_t team = {
 
 /* single word (4) or double word (8) alignment */
 #define ALIGNMENT 8
-#define GET(p)       (*(unsigned int *)(p))            //line:vm:mm:get
-#define PUT(p, val)  (*(unsigned int *)(p) = (val))    //line:vm:mm:put
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
 define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
+
+// OUR CUSTOM MACROS GO HERE
+
+#define GET(p)       (*(unsigned int *)(p))            //line:vm:mm:get
+#define PUT(p, val)  (*(unsigned int *)(p) = (val))    //line:vm:mm:put
+#define MAX(x, y) ((x) > (y)? (x) : (y))
+
+void printTheHeap(){
+    printf("aloha");
+}
 
 /* 
  * mm_init - initialize the malloc package.
@@ -55,6 +63,7 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
+    printTheHeap();
     int newsize = ALIGN(size + SIZE_T_SIZE);
     void *p = mem_sbrk(newsize);
     if (p == (void *)-1)
