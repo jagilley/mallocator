@@ -24,7 +24,7 @@
  ********************************************************/
 team_t team = {
     /* First member's full name */
-    "Jasper A Gilley",
+    "Jasper Gilley",
     /* First member's NetID */
     "jag8808",
     /* Second member's full name (leave blank if none) */
