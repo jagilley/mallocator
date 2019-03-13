@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
 #include "mm.h"
 #include "memlib.h"
 
@@ -32,7 +31,7 @@ team_t team = {
 /* Pack a size and allocated bit into a word */
 #define PACK(size, alloc)  ((size) | (alloc)) //line:vm:mm:pack
 
-/* Read and write a word at address p */
+// Read and write a word at address p
 #define GET(p)       (*(unsigned int *)(p))            //line:vm:mm:get
 #define PUT(p, val)  (*(unsigned int *)(p) = (val))    //line:vm:mm:put
 
@@ -65,8 +64,7 @@ static void checkblock(void *bp);
 /* 
  * mm_init - Initialize the memory manager 
  */
-int mm_init(void) 
-{
+int mm_init(void){
     /* Create the initial empty heap */
     if ((heap_listp = mem_sbrk(4*WSIZE)) == (void *)-1) //line:vm:mm:begininit
         return -1;
@@ -89,8 +87,7 @@ int mm_init(void)
 /* 
  * mm_malloc - Allocate a block with at least size bytes of payload 
  */
-void *mm_malloc(size_t size) 
-{
+void *mm_malloc(size_t size){
     size_t asize;      /* Adjusted block size */
     size_t extendsize; /* Amount to extend heap if no fit */
     char *bp;      
@@ -125,8 +122,7 @@ void *mm_malloc(size_t size)
 /* 
  * mm_free - Free a block
  */
-void mm_free(void *bp)
-{
+void mm_free(void *bp){
     if (bp == 0) 
         return;
 
@@ -143,8 +139,7 @@ void mm_free(void *bp)
 /*
  * coalesce - Boundary tag coalescing. Return ptr to coalesced block
  */
-static void *coalesce(void *bp) 
-{
+static void *coalesce(void *bp){
     size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
     size_t size = GET_SIZE(HDRP(bp));
@@ -185,8 +180,7 @@ static void *coalesce(void *bp)
 /*
  * mm_realloc - Naive implementation of realloc
  */
-void *mm_realloc(void *ptr, size_t size)
-{
+void *mm_realloc(void *ptr, size_t size){
     size_t oldsize;
     void *newptr;
 
@@ -222,8 +216,7 @@ void *mm_realloc(void *ptr, size_t size)
 /* 
  * mm_checkheap - Check the heap for correctness
  */
-void mm_checkheap(int verbose)  
-{ 
+void mm_checkheap(int verbose){
     checkheap(verbose);
 }
 
@@ -232,8 +225,7 @@ void mm_checkheap(int verbose)
 /* 
  * extend_heap - Extend heap with free block and return its block pointer
  */
-static void *extend_heap(size_t words) 
-{
+static void *extend_heap(size_t words){
     char *bp;
     size_t size;
 
@@ -255,8 +247,7 @@ static void *extend_heap(size_t words)
  * place - Place block of asize bytes at start of free block bp 
  *         and split if remainder would be at least minimum block size
  */
-static void place(void *bp, size_t asize)
-{
+static void place(void *bp, size_t asize){
     size_t csize = GET_SIZE(HDRP(bp));   
 
     if ((csize - asize) >= (2*DSIZE)) { 
@@ -275,9 +266,7 @@ static void place(void *bp, size_t asize)
 /* 
  * find_fit - Find a fit for a block with asize bytes 
  */
-static void *find_fit(size_t asize)
-{
-
+static void *find_fit(size_t asize){
 #ifdef NEXT_FIT 
     /* Next fit search */
     char *oldrover = rover;
@@ -306,8 +295,7 @@ static void *find_fit(size_t asize)
 #endif
 }
 
-static void printblock(void *bp) 
-{
+static void printblock(void *bp){
     size_t hsize, halloc, fsize, falloc;
 
     checkheap(0);
@@ -326,8 +314,7 @@ static void printblock(void *bp)
            fsize, (falloc ? 'a' : 'f')); 
 }
 
-static void checkblock(void *bp) 
-{
+static void checkblock(void *bp){
     if ((size_t)bp % 8)
         printf("Error: %p is not doubleword aligned\n", bp);
     if (GET(HDRP(bp)) != GET(FTRP(bp)))
@@ -337,8 +324,7 @@ static void checkblock(void *bp)
 /* 
  * checkheap - Minimal check of the heap for consistency 
  */
-void checkheap(int verbose) 
-{
+void checkheap(int verbose){
     char *bp = heap_listp;
 
     if (verbose)
