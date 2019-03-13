@@ -5,12 +5,26 @@
 #include "mm.h"
 #include "memlib.h"
 
+/*********************************************************
+ * NOTE TO STUDENTS: Before you do anything else, please
+ * provide your team information in the following struct.
+ ********************************************************/
+team_t team = {
+    /* First member's full name */
+    "Jasper Gilley",
+    /* First member's NetID */
+    "jag8808",
+    /* Second member's full name (leave blank if none) */
+    "Julia Tournant",
+    /* Second member's NetID */
+    "jmt8793"
+};
+
 /*
  * If NEXT_FIT defined use next fit search, else use first-fit search 
  */
 #define NEXT_FITx
 
-/* $begin mallocmacros */
 /* Basic constants and macros */
 #define WSIZE       4       /* Word and header/footer size (bytes) */ //line:vm:mm:beginconst
 #define DSIZE       8       /* Double word size (bytes) */
@@ -36,7 +50,6 @@
 /* Given block ptr bp, compute address of next and previous blocks */
 #define NEXT_BLKP(bp)  ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE))) //line:vm:mm:nextblkp
 #define PREV_BLKP(bp)  ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE))) //line:vm:mm:prevblkp
-/* $end mallocmacros */
 
 /* Global variables */
 static char *heap_listp = 0;  /* Pointer to first block */  
@@ -56,7 +69,6 @@ static void checkblock(void *bp);
 /* 
  * mm_init - Initialize the memory manager 
  */
-/* $begin mminit */
 int mm_init(void) 
 {
     /* Create the initial empty heap */
@@ -67,35 +79,29 @@ int mm_init(void)
     PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1)); /* Prologue footer */ 
     PUT(heap_listp + (3*WSIZE), PACK(0, 1));     /* Epilogue header */
     heap_listp += (2*WSIZE);                     //line:vm:mm:endinit  
-    /* $end mminit */
 
 #ifdef NEXT_FIT
     rover = heap_listp;
 #endif
-    /* $begin mminit */
 
     /* Extend the empty heap with a free block of CHUNKSIZE bytes */
     if (extend_heap(CHUNKSIZE/WSIZE) == NULL) 
         return -1;
     return 0;
 }
-/* $end mminit */
 
 /* 
  * mm_malloc - Allocate a block with at least size bytes of payload 
  */
-/* $begin mmmalloc */
 void *mm_malloc(size_t size) 
 {
     size_t asize;      /* Adjusted block size */
     size_t extendsize; /* Amount to extend heap if no fit */
     char *bp;      
 
-    /* $end mmmalloc */
     if (heap_listp == 0){
         mm_init();
     }
-    /* $begin mmmalloc */
     /* Ignore spurious requests */
     if (size == 0)
         return NULL;
@@ -119,36 +125,28 @@ void *mm_malloc(size_t size)
     place(bp, asize);                                 //line:vm:mm:growheap3
     return bp;
 } 
-/* $end mmmalloc */
 
 /* 
- * mm_free - Free a block 
+ * mm_free - Free a block
  */
-/* $begin mmfree */
 void mm_free(void *bp)
 {
-    /* $end mmfree */
     if (bp == 0) 
         return;
 
-    /* $begin mmfree */
     size_t size = GET_SIZE(HDRP(bp));
-    /* $end mmfree */
     if (heap_listp == 0){
         mm_init();
     }
-    /* $begin mmfree */
 
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
     coalesce(bp);
 }
 
-/* $end mmfree */
 /*
  * coalesce - Boundary tag coalescing. Return ptr to coalesced block
  */
-/* $begin mmfree */
 static void *coalesce(void *bp) 
 {
     size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
@@ -179,17 +177,14 @@ static void *coalesce(void *bp)
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
     }
-    /* $end mmfree */
 #ifdef NEXT_FIT
     /* Make sure the rover isn't pointing into the free block */
     /* that we just coalesced */
     if ((rover > (char *)bp) && (rover < NEXT_BLKP(bp))) 
         rover = bp;
 #endif
-    /* $begin mmfree */
     return bp;
 }
-/* $end mmfree */
 
 /*
  * mm_realloc - Naive implementation of realloc
@@ -243,7 +238,6 @@ void mm_checkheap(int verbose)
 /* 
  * extend_heap - Extend heap with free block and return its block pointer
  */
-/* $begin mmextendheap */
 static void *extend_heap(size_t words) 
 {
     char *bp;
@@ -262,16 +256,12 @@ static void *extend_heap(size_t words)
     /* Coalesce if the previous block was free */
     return coalesce(bp);                                          //line:vm:mm:returnblock
 }
-/* $end mmextendheap */
 
 /* 
  * place - Place block of asize bytes at start of free block bp 
  *         and split if remainder would be at least minimum block size
  */
-/* $begin mmplace */
-/* $begin mmplace-proto */
 static void place(void *bp, size_t asize)
-/* $end mmplace-proto */
 {
     size_t csize = GET_SIZE(HDRP(bp));   
 
@@ -287,17 +277,12 @@ static void place(void *bp, size_t asize)
         PUT(FTRP(bp), PACK(csize, 1));
     }
 }
-/* $end mmplace */
 
 /* 
  * find_fit - Find a fit for a block with asize bytes 
  */
-/* $begin mmfirstfit */
-/* $begin mmfirstfit-proto */
 static void *find_fit(size_t asize)
-/* $end mmfirstfit-proto */
 {
-    /* $end mmfirstfit */
 
 #ifdef NEXT_FIT 
     /* Next fit search */
@@ -315,7 +300,6 @@ static void *find_fit(size_t asize)
 
     return NULL;  /* no fit found */
 #else 
-    /* $begin mmfirstfit */
     /* First-fit search */
     void *bp;
 
@@ -327,7 +311,6 @@ static void *find_fit(size_t asize)
     return NULL; /* No fit */
 #endif
 }
-/* $end mmfirstfit */
 
 static void printblock(void *bp) 
 {
