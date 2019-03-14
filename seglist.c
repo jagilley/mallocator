@@ -19,7 +19,9 @@ team_t team = {
 /*
  * If NEXT_FIT defined use next fit search, else use first-fit search 
  */
-#define NEXT_FIT
+#define NEXT_FITx
+
+#define seglist
 
 /* Basic constants and macros */
 #define WSIZE       4       /* Word and header/footer size (bytes) */
@@ -32,14 +34,15 @@ team_t team = {
 #define PACK(size, alloc)  ((size) | (alloc))
 
 // Read and write a word at address p
-#define GET(p)       (*(unsigned int *)(p))           
-#define PUT(p, val)  (*(unsigned int *)(p) = (val))  
+#define GET(p)       (*(unsigned int *)(p)) // reads and returns the word referenced by argument p
+#define PUT(p, val)  (*(unsigned int *)(p) = (val)) // stores val in the word pointed at by argument p
 
 /* Read the size and allocated fields from address p */
 #define GET_SIZE(p)  (GET(p) & ~0x7) // size is gonna be the first 7 bits
 #define GET_ALLOC(p) (GET(p) & 0x1) // alloc is gonna be the last bit
 
 /* Given block ptr bp, compute address of its header and footer */
+// return pointers to the block header and footer, respectively
 #define HDRP(bp)       ((char *)(bp) - WSIZE)                      
 #define FTRP(bp)       ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE) 
 
@@ -47,11 +50,19 @@ team_t team = {
 #define NEXT_BLKP(bp)  ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE))) 
 #define PREV_BLKP(bp)  ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
-/* Global variables */
-static char *heap_listp = 0;  /* Pointer to first block */  
+// globals
+static char *heap_listp = 0;  // Pointer to first block
 #ifdef NEXT_FIT
 static char *rover;           /* Next fit rover */
 #endif
+
+// Seglist-specific helper functions //
+
+// we're gonna need JUST the pointer to next free
+#define seglist_pack(next) (next)
+
+
+// End seglist-specific helper functions //
 
 static void *extend_heap(size_t words);
 static void place(void *bp, size_t asize);
@@ -62,21 +73,28 @@ static void checkheap(int verbose);
 static void checkblock(void *bp);
 
 /* 
- * mm_init - Initialize the memory manager 
+ * mm_init - Initialize the memory manager k
+ * gets four words from the memory system and initializes them to create an empty free list
+ * Then it calls extend_heap, which extends by chunksize bytes and creates initial free block
  */
 int mm_init(void){
-    /* Create the initial empty heap */
-    if ((heap_listp = mem_sbrk(4*WSIZE)) == (void *)-1)
+    // WSIZE is just the size of a word! Namely, 4 bytes
+    if ((heap_listp = mem_sbrk(4*WSIZE)) == (void *)-1){
         return -1;
-    PUT(heap_listp, 0);                          /* Alignment padding */
-    PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1)); /* Prologue header */ 
-    PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1)); /* Prologue footer */ 
-    PUT(heap_listp + (3*WSIZE), PACK(0, 1));     /* Epilogue header */
-    heap_listp += (2*WSIZE);                    
+    }
+    PUT(heap_listp, 0); // Put 0 at the heap listpointer
+    PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1)); // Puts the prologue header in (heap_listp + (1*WSIZE))
+    PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1)); // Puts the prologue footer in (heap_listp + (2*WSIZE))
+    PUT(heap_listp + (3*WSIZE), PACK(0, 1)); // Epilogue header
+    heap_listp += (2*WSIZE);
 
 #ifdef NEXT_FIT
     rover = heap_listp;
 #endif
+/*
+#ifdef seglist
+    
+#endif*/
 
     /* Extend the empty heap with a free block of CHUNKSIZE bytes */
     if (extend_heap(CHUNKSIZE/WSIZE) == NULL) 
@@ -95,9 +113,10 @@ void *mm_malloc(size_t size){
     if (heap_listp == 0){
         mm_init();
     }
-    /* Ignore spurious requests */
-    if (size == 0)
+    if (size == 0){
+        // you can't allocate 0 bytes, silly!
         return NULL;
+    }
 
     /* Adjust block size to include overhead and alignment reqs. */
     if (size <= DSIZE){
@@ -108,7 +127,8 @@ void *mm_malloc(size_t size){
     }
 
     /* Search the free list for a fit */
-    if ((bp = find_fit(asize)) != NULL) { 
+    if ((bp = find_fit(asize)) != NULL) {
+        // can we find a fit?
         place(bp, asize);
         return bp;
     }
@@ -116,6 +136,7 @@ void *mm_malloc(size_t size){
     /* No fit found. Get more memory and place the block */
     extendsize = MAX(asize,CHUNKSIZE);
     if ((bp = extend_heap(extendsize/WSIZE)) == NULL){
+        // return null if heap extending fails
         return NULL;
     }
     place(bp, asize);
@@ -125,18 +146,18 @@ void *mm_malloc(size_t size){
 /* 
  * mm_free - Free a block
  */
-void mm_free(void *ptr){
-    if (ptr == 0) 
+void mm_free(void *bp){
+    if (bp == 0) 
         return;
 
-    size_t size = GET_SIZE(HDRP(ptr));
+    size_t size = GET_SIZE(HDRP(bp));
     if (heap_listp == 0){
         mm_init();
     }
 
-    PUT(HDRP(ptr), PACK(size, 0));
-    PUT(FTRP(ptr), PACK(size, 0));
-    coalesce(ptr);
+    PUT(HDRP(bp), PACK(size, 0));
+    PUT(FTRP(bp), PACK(size, 0));
+    coalesce(bp);
 }
 
 /*
@@ -234,8 +255,10 @@ static void *extend_heap(size_t words){
 
     /* Allocate an even number of words to maintain alignment */
     size = (words % 2) ? (words+1) * WSIZE : words * WSIZE;
-    if ((long)(bp = mem_sbrk(size)) == -1)  
-        return NULL;                                      
+    if ((long)(bp = mem_sbrk(size)) == -1){
+        // did mem_sbrk fail?
+        return NULL;
+    }
 
     /* Initialize free block header/footer and the epilogue header */
     PUT(HDRP(bp), PACK(size, 0));         /* Free block header */  
