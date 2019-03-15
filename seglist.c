@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "mm.h"
 #include "memlib.h"
+#include <math.h>
 
 team_t team = {
     "jj",
@@ -16,12 +17,7 @@ team_t team = {
     "jmt8793"
 };
 
-/*
- * If NEXT_FIT defined use next fit search, else use first-fit search 
- */
-#define NEXT_FITx
-
-#define seglist
+#define seglistx
 
 /* Basic constants and macros */
 #define WSIZE       4       /* Word and header/footer size (bytes) */
@@ -51,16 +47,22 @@ team_t team = {
 #define PREV_BLKP(bp)  ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
 // globals
-static char *heap_listp = 0;  // Pointer to first block
-#ifdef NEXT_FIT
-static char *rover;           /* Next fit rover */
-#endif
+static char *heap_listp = 0; // Pointer to first block
+static char *free_listp = 0; // pointer to the next free block
 
 // Seglist-specific helper functions //
 
-// we're gonna need JUST the pointer to next free
-#define seglist_pack(next) (next)
-
+/*
+Given the integer size of a block to be allocated, seglist_categorizer()
+returns the upper size limit of the list in which it should be allocated.
+Depends upon the call to #include <math.h>
+*/
+int seglist_categorizer(int thisSize){
+    // this is confirmed working!
+    double thisSizeDouble = ((double) thisSize);
+    double log2thisSize = (log(thisSizeDouble)/log(2));
+    return (int)ceil(log2thisSize);
+}
 
 // End seglist-specific helper functions //
 
@@ -88,14 +90,6 @@ int mm_init(void){
     PUT(heap_listp + (3*WSIZE), PACK(0, 1)); // Epilogue header
     heap_listp += (2*WSIZE);
 
-#ifdef NEXT_FIT
-    rover = heap_listp;
-#endif
-/*
-#ifdef seglist
-    
-#endif*/
-
     /* Extend the empty heap with a free block of CHUNKSIZE bytes */
     if (extend_heap(CHUNKSIZE/WSIZE) == NULL) 
         return -1;
@@ -108,7 +102,7 @@ int mm_init(void){
 void *mm_malloc(size_t size){
     size_t asize;      /* Adjusted block size */
     size_t extendsize; /* Amount to extend heap if no fit */
-    char *bp;      
+    char *bp;
 
     if (heap_listp == 0){
         mm_init();
@@ -127,7 +121,7 @@ void *mm_malloc(size_t size){
     }
 
     /* Search the free list for a fit */
-    if ((bp = find_fit(asize)) != NULL) {
+    if ((bp = find_fit(asize)) != NULL){
         // can we find a fit?
         place(bp, asize);
         return bp;
@@ -192,12 +186,6 @@ static void *coalesce(void *bp){
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
     }
-#ifdef NEXT_FIT
-    /* Make sure the rover isn't pointing into the free block */
-    /* that we just coalesced */
-    if ((rover > (char *)bp) && (rover < NEXT_BLKP(bp))) 
-        rover = bp;
-#endif
     return bp;
 }
 
@@ -266,7 +254,7 @@ static void *extend_heap(size_t words){
     PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /* New epilogue header */
 
     /* Coalesce if the previous block was free */
-    return coalesce(bp);                                       
+    return coalesce(bp);
 }
 
 /* 
@@ -274,12 +262,19 @@ static void *extend_heap(size_t words){
  *         and split if remainder would be at least minimum block size
  */
 static void place(void *bp, size_t asize){
-    size_t csize = GET_SIZE(HDRP(bp));   
+    /*
+    we need a pointer to the block to let us know where it is, and we need a
+    size denoter so we know what size class to put it in.
+    */
+    size_t csize = GET_SIZE(HDRP(bp));
+    // asize is the adjusted block size
+    // csize is the size of the block, read from the block itself
 
-    if ((csize - asize) >= (2*DSIZE)) { 
-        PUT(HDRP(bp), PACK(asize, 1));
-        PUT(FTRP(bp), PACK(asize, 1));
-        bp = NEXT_BLKP(bp);
+    if ((csize - asize) >= (2*DSIZE)) {
+        // DSIZE is the size of a doubleword, 8
+        PUT(HDRP(bp), PACK(asize, 1)); // put the header in its rightful place
+        PUT(FTRP(bp), PACK(asize, 1)); // put the footer in its rightful place
+        bp = NEXT_BLKP(bp); // navigate to the next block
         PUT(HDRP(bp), PACK(csize-asize, 0));
         PUT(FTRP(bp), PACK(csize-asize, 0));
     }
@@ -293,23 +288,6 @@ static void place(void *bp, size_t asize){
  * find_fit - Find a fit for a block with asize bytes 
  */
 static void *find_fit(size_t asize){
-#ifdef NEXT_FIT 
-    /* Next fit search */
-    char *oldrover = rover;
-
-    /* Search from the rover to the end of list */
-    for ( ; GET_SIZE(HDRP(rover)) > 0; rover = NEXT_BLKP(rover))
-        if (!GET_ALLOC(HDRP(rover)) && (asize <= GET_SIZE(HDRP(rover))))
-            return rover;
-
-    /* search from start of list to old rover */
-    for (rover = heap_listp; rover < oldrover; rover = NEXT_BLKP(rover))
-        if (!GET_ALLOC(HDRP(rover)) && (asize <= GET_SIZE(HDRP(rover))))
-            return rover;
-
-    return NULL;  /* no fit found */
-#else 
-    /* First-fit search */
     void *bp;
 
     for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
@@ -318,7 +296,6 @@ static void *find_fit(size_t asize){
         }
     }
     return NULL; /* No fit */
-#endif
 }
 
 static void printblock(void *bp){

@@ -26,7 +26,7 @@ team_t team = {
 #define DSIZE       8       /* Double word size (bytes) */
 #define CHUNKSIZE  (1<<12)  /* Extend heap by this amount (bytes) */
 
-#define MAX(x, y) ((x) > (y)? (x) : (y))  
+#define MAX(x, y) ((x) > (y)? (x) : (y))
 
 /* Pack a size and allocated bit into a word */
 #define PACK(size, alloc)  ((size) | (alloc))
@@ -52,6 +52,20 @@ static char *heap_listp = 0;  /* Pointer to first block */
 #ifdef NEXT_FIT
 static char *rover;           /* Next fit rover */
 #endif
+
+// seglist stuff
+
+/*
+Given the integer size of a block to be allocated, seglist_categorizer()
+returns the upper size limit of the list in which it should be allocated.
+Depends upon the call to #include <math.h>
+*/
+int seglist_categorizer(int thisSize){
+    // this is confirmed working!
+    double thisSizeDouble = ((double) thisSize);
+    double log2thisSize = (log(thisSizeDouble)/log(2));
+    return (int)ceil(log2thisSize);
+}
 
 static void *extend_heap(size_t words);
 static void place(void *bp, size_t asize);
